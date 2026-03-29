@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>AURA LIVE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080c12;
+      --panel:    rgba(8, 12, 20, 0.88);
+      --border:   rgba(255, 255, 255, 0.10);
+      --accent:   #ff2d55;
+      --cyan:     #00e0ff;
+      --green:    #30d158;
+      --txt:      #f2f5fc;
+      --txt-mid:  #8b95a8;
+      --txt-dim:  #4a5568;
+      --radius:   16px;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--txt);
+      font-family: 'Inter', system-ui, sans-serif;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── FULLSCREEN CANVAS LAYER ── */
+    #deepar-root {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100dvh; /* FIX: use dvh for mobile address bar */
+      background: #000;
+      z-index: 0;
+      overflow: hidden; /* FIX: clip any overflow canvas */
+    }
+
+    /* FIX: More aggressive canvas fullscreen targeting */
+    #deepar-root canvas,
+    #deepar-root video {
+      position: absolute !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      min-width: 100% !important;
+      min-height: 100% !important;
+      width: 100vw !important;
+      height: 100dvh !important;
+      object-fit: cover !important;
+      display: block !important;
+    }
+
+    .grad-top {
+      position: fixed; inset: 0; bottom: auto;
+      height: 180px;
+      background: linear-gradient(to bottom, rgba(0,0,0,.65), transparent);
+      z-index: 2; pointer-events: none;
+    }
+    .grad-bottom {
+      position: fixed; inset: auto 0 0;
+      height: 340px;
+      background: linear-gradient(to top, rgba(5,8,15,.96) 0%, rgba(5,8,15,.7) 60%, transparent 100%);
+      z-index: 2; pointer-events: none;
+    }
+
+    /* ── INIT OVERLAY ── */
+    #init-overlay {
+      position: fixed; inset: 0;
+      z-index: 100;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px; padding: 40px;
+      text-align: center;
+      transition: opacity 0.5s;
+    }
+    #init-overlay.fade-out { opacity: 0; pointer-events: none; }
+    #init-overlay.hidden   { display: none; }
+
+    .brand-name {
+      font-size: 28px; font-weight: 700;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      background: linear-gradient(90deg, #fff 0%, var(--cyan) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .spinner {
+      width: 52px; height: 52px;
+      border: 3px solid rgba(0, 224, 255, 0.15);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #status-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--txt-mid);
+      letter-spacing: 0.10em;
+      min-height: 18px;
+      max-width: 280px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .progress-track {
+      width: 220px; height: 3px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--cyan), #007aff);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    #grant-btn {
+      display: none;
+      padding: 13px 32px; border: none; border-radius: 100px;
+      background: linear-gradient(135deg, var(--accent), #c01234);
+      color: #fff; font-family: 'Inter', sans-serif;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer; margin-top: 8px;
+      box-shadow: 0 0 28px rgba(255,45,85,.4);
+      transition: transform .15s;
+    }
+    #grant-btn:active { transform: scale(.97); }
+
+    /* ── TOP BAR ── */
+    #top-bar {
+      position: fixed;
+      top: max(14px, env(safe-area-inset-top));
+      left: 0; right: 0;
+      z-index: 10;
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+    }
+
+    .app-brand {
+      font-size: 15px; font-weight: 700;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      background: linear-gradient(90deg, #fff, var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    #live-badge {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--accent);
+      padding: 4px 12px; border-radius: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    #live-badge.visible { opacity: 1; }
+    #live-badge::before {
+      content: '';
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #fff;
+      animation: blink 1.1s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    #stream-timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; font-weight: 600;
+      color: var(--cyan); letter-spacing: 0.12em;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    #stream-timer.visible { opacity: 1; }
+
+    /* ── RUNTIME STATUS ── */
+    #runtime-status {
+      position: fixed;
+      top: max(60px, calc(env(safe-area-inset-top) + 46px));
+      left: 50%; transform: translateX(-50%);
+      z-index: 10;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      padding: 6px 16px; border-radius: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--txt-mid);
+      letter-spacing: 0.10em; text-transform: uppercase;
+      white-space: nowrap;
+      transition: opacity 0.3s;
+    }
+
+    /* ── BOTTOM CONTROL PANEL ── */
+    #control-panel {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 10;
+      padding: 0 20px max(28px, env(safe-area-inset-bottom));
+    }
+
+    #rtmp-info {
+      display: none;
+      margin-bottom: 14px;
+      background: rgba(0,0,0,.55);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px; padding: 10px 14px;
+      align-items: center; gap: 10px;
+    }
+    #rtmp-info.visible { display: flex; }
+    .rtmp-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; color: var(--txt-dim);
+      text-transform: uppercase; letter-spacing: 0.10em;
+      flex-shrink: 0;
+    }
+    .rtmp-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--cyan);
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    #filter-row {
+      display: flex; gap: 10px;
+      margin-bottom: 20px;
+      justify-content: center;
+    }
+
+    .filter-btn {
+      flex: 1; max-width: 160px;
+      padding: 12px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      color: var(--txt-mid);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: color .2s, border-color .2s, background .2s, transform .15s;
+    }
+    .filter-btn:active { transform: scale(.96); }
+    .filter-btn:disabled {
+      opacity: 0.4; cursor: not-allowed; transform: none;
+    }
+    .filter-btn.active-filter {
+      background: rgba(0,224,255,.10);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .filter-btn .btn-icon { font-size: 16px; line-height: 1; }
+
+    #main-controls {
+      display: flex; align-items: center;
+      justify-content: center; gap: 18px;
+    }
+
+    .side-ctrl {
+      width: 50px; height: 50px; border-radius: 50%;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--txt-mid);
+      transition: color .2s, border-color .2s, transform .15s;
+    }
+    .side-ctrl:active { transform: scale(.9); }
+    .side-ctrl.muted  { color: var(--accent); border-color: rgba(255,45,85,.4); }
+
+    #go-live-btn {
+      width: 84px; height: 84px; border-radius: 50%;
+      background: linear-gradient(145deg, var(--accent) 0%, #b01030 100%);
+      border: none; cursor: pointer;
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 3px;
+      transition: transform .15s;
+      box-shadow: 0 4px 30px rgba(255,45,85,.55);
+    }
+    #go-live-btn::before,
+    #go-live-btn::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(255,45,85,.4);
+      animation: pulse-ring 2.2s ease-out infinite;
+    }
+    #go-live-btn::after { animation-delay: 1.1s; }
+
+    @keyframes pulse-ring {
+      0%   { width: 84px;  height: 84px;  opacity: .7; }
+      100% { width: 150px; height: 150px; opacity: 0;  }
+    }
+
+    #go-live-btn.streaming {
+      background: linear-gradient(145deg, #1a1c26, #0d0f18);
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 24px rgba(255,45,85,.35);
+    }
+    #go-live-btn.streaming::before,
+    #go-live-btn.streaming::after { display: none; }
+
+    #go-live-btn:active  { transform: scale(.93); }
+    #go-live-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+    #go-live-btn .btn-icon-live { pointer-events: none; }
+    #go-live-btn .btn-lbl {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; font-weight: 600;
+      color: #fff; letter-spacing: 0.12em;
+      text-transform: uppercase; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="deepar-root"></div>
+
+  <div class="grad-top"></div>
+  <div class="grad-bottom"></div>
+
+  <div id="init-overlay">
+    <div class="brand-name">AURA LIVE</div>
+    <div class="spinner"></div>
+    <div id="status-text">Starting…</div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+    <button id="grant-btn" onclick="requestCameraAndInit()">Grant Camera Access</button>
+  </div>
+
+  <div id="top-bar">
+    <div class="app-brand">Aura</div>
+    <div id="live-badge">LIVE</div>
+    <div id="stream-timer">00:00</div>
+  </div>
+
+  <div id="runtime-status">Initializing…</div>
+
+  <div id="control-panel">
+    <div id="rtmp-info">
+      <span class="rtmp-label">RTMP</span>
+      <span class="rtmp-value" id="rtmp-url-display">rtmp://live.aura.io/stream/JOM0PT6S</span>
+    </div>
+
+    <div id="filter-row">
+      <button class="filter-btn active-filter" id="btn-humanoid" onclick="applyHumanoid()" disabled>
+        <span class="btn-icon">🤖</span> Apply Humanoid
+      </button>
+      <button class="filter-btn" id="btn-clear" onclick="clearFilter()" disabled>
+        <span class="btn-icon">✕</span> Clear Filter
+      </button>
+    </div>
+
+    <div id="main-controls">
+      <div class="side-ctrl" id="mic-btn" onclick="toggleMic()" title="Toggle microphone">
+        <svg id="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </div>
+
+      <button id="go-live-btn" onclick="toggleStream()" disabled>
+        <div class="btn-icon-live" id="live-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </div>
+        <div class="btn-lbl" id="live-lbl">GO LIVE</div>
+      </button>
+
+      <div class="side-ctrl" id="flip-btn" onclick="flipCamera()" title="Flip camera">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 4 1 10 7 10"/>
+          <polyline points="23 20 23 14 17 14"/>
+          <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- DeepAR SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/deepar/dist/deepar.js"></script>
+
+  <script>
+  /* ══════════════════════════════════════════════════════════
+     CONFIGURATION
+  ══════════════════════════════════════════════════════════ */
+  const DEEPAR_LICENSE_KEY =
+    'B3c5826bcabea8a92afbf4bbd0daef27fea4233f857156feb306e9074a4f6ddbf0368f1f664917c0';
+
+  const DEEPAR_LIB_PATH =
+    'https://cdn.jsdelivr.net/npm/deepar/lib/';
+
+  const FACE_TRACKING_MODEL =
+    'https://cdn.jsdelivr.net/npm/deepar/models/face/models-6k-v1.bin';
+
+  const EFFECT_HUMANOID =
+    'https://cdn.jsdelivr.net/npm/deepar/effects/Humanoid';
+
+  const RTMP_URL   = 'rtmp://live.aura.io/stream/';
+  const STREAM_KEY = 'JOM0PT6S';
+
+  /* ══════════════════════════════════════════════════════════
+     STATE
+  ══════════════════════════════════════════════════════════ */
+  let deepAR         = null;
+  let liveStream     = null;
+  let mediaRecorder  = null;
+  let isStreaming    = false;
+  let micMuted       = false;
+  let facingMode     = 'user';   // FIX: track current facing mode
+  let timerInterval  = null;
+  let elapsedSeconds = 0;
+  let humanoidActive = false;
+  let isFlipping     = false;    // FIX: guard against rapid flip taps
+
+  /* ══════════════════════════════════════════════════════════
+     DOM REFERENCES
+  ══════════════════════════════════════════════════════════ */
+  const overlay      = document.getElementById('init-overlay');
+  const statusText   = document.getElementById('status-text');
+  const progressFill = document.getElementById('progress-fill');
+  const grantBtn     = document.getElementById('grant-btn');
+  const runtimeStatus= document.getElementById('runtime-status');
+  const liveBadge    = document.getElementById('live-badge');
+  const streamTimer  = document.getElementById('stream-timer');
+  const rtmpInfo     = document.getElementById('rtmp-info');
+  const goLiveBtn    = document.getElementById('go-live-btn');
+  const liveLbl      = document.getElementById('live-lbl');
+  const liveIcon     = document.getElementById('live-icon');
+  const btnHumanoid  = document.getElementById('btn-humanoid');
+  const btnClear     = document.getElementById('btn-clear');
+  const micBtn       = document.getElementById('mic-btn');
+  const micIconEl    = document.getElementById('mic-icon');
+  const deeparRoot   = document.getElementById('deepar-root');
+  const flipBtn      = document.getElementById('flip-btn');
+
+  /* ══════════════════════════════════════════════════════════
+     STEP 1 — Request camera + init
+  ══════════════════════════════════════════════════════════ */
+  async function requestCameraAndInit() {
+    grantBtn.style.display = 'none';
+    setStatus('Requesting camera permission…', 5);
+
+    try {
+      // FIX: probe to trigger browser permission dialog before DeepAR tries
+      const probe = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: true
+      });
+      probe.getTracks().forEach(t => t.stop());
+      await initDeepAR();
+    } catch (err) {
+      handleCameraError(err);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     STEP 2 — Initialize DeepAR
+  ══════════════════════════════════════════════════════════ */
+  async function initDeepAR() {
+    setStatus('Loading DeepAR engine…', 15);
+
+    try {
+      deepAR = await DeepAR({
+        licenseKey:  DEEPAR_LICENSE_KEY,
+        libPath:     DEEPAR_LIB_PATH,
+        rootElement: deeparRoot,
+        additionalOptions: {
+          // FIX: pass cameraConfig correctly; some versions need 'facingMode' string
+          cameraConfig: {
+            facingMode: facingMode,
+            width:  { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        }
+      });
+
+      setStatus('Engine ready. Fixing canvas…', 40);
+      forceCanvasFullscreen();
+
+      setStatus('Loading face tracking model…', 55);
+      await deepAR.downloadFaceTrackingModel(FACE_TRACKING_MODEL);
+
+      setStatus('Applying Humanoid filter…', 75);
+      await applyHumanoid();
+
+      setStatus('Ready ✓', 100);
+      await sleep(400);
+
+      overlay.classList.add('fade-out');
+      setTimeout(() => overlay.classList.add('hidden'), 600);
+
+      goLiveBtn.disabled   = false;
+      btnHumanoid.disabled = false;
+      btnClear.disabled    = false;
+
+      setRuntimeStatus('● Ready');
+
+    } catch (err) {
+      console.error('[DeepAR init error]', err);
+      const msg = err?.message || 'Unknown error';
+      setStatus(`Error: ${msg}`, 0);
+      grantBtn.textContent = 'Retry';
+      grantBtn.style.display = 'block';
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     FORCE CANVAS FULLSCREEN
+     FIX: Use MutationObserver + ResizeObserver + resize event
+          to keep canvas filling screen at all times.
+  ══════════════════════════════════════════════════════════ */
+  function forceCanvasFullscreen() {
+    function applyStyles() {
+      const canvases = deeparRoot.querySelectorAll('canvas, video');
+      canvases.forEach(el => {
+        el.style.cssText = [
+          'position: absolute !important',
+          'top: 50% !important',
+          'left: 50% !important',
+          'transform: translate(-50%, -50%) !important',
+          'min-width: 100% !important',
+          'min-height: 100% !important',
+          'width: 100vw !important',
+          'height: 100dvh !important',
+          'object-fit: cover !important',
+          'display: block !important',
+        ].join(';');
+      });
+    }
+
+    applyStyles();
+
+    // Watch for new canvas/video elements being added
+    const mutObs = new MutationObserver(applyStyles);
+    mutObs.observe(deeparRoot, { childList: true, subtree: true, attributes: true });
+
+    // Re-apply on resize (handles device rotation too)
+    window.addEventListener('resize', applyStyles);
+    window.addEventListener('orientationchange', () => { sleep(150).then(applyStyles); });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     APPLY HUMANOID FILTER
+  ══════════════════════════════════════════════════════════ */
+  async function applyHumanoid() {
+    if (!deepAR) return;
+    btnHumanoid.disabled = true;
+    setRuntimeStatus('Applying Humanoid filter…');
+
+    try {
+      await deepAR.switchEffect(EFFECT_HUMANOID);
+      humanoidActive = true;
+      btnHumanoid.classList.add('active-filter');
+      btnClear.classList.remove('active-filter');
+      setRuntimeStatus('● Humanoid filter active');
+    } catch (err) {
+      console.error('[Effect error]', err);
+      setRuntimeStatus('⚠ Filter load failed — check CDN / licence');
+    } finally {
+      btnHumanoid.disabled = false;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     CLEAR FILTER
+  ══════════════════════════════════════════════════════════ */
+  async function clearFilter() {
+    if (!deepAR) return;
+    btnClear.disabled = true;
+    setRuntimeStatus('Clearing filter…');
+
+    try {
+      // FIX: clearEffect() may not exist on all versions; fall back gracefully
+      if (typeof deepAR.clearEffect === 'function') {
+        await deepAR.clearEffect();
+      } else if (typeof deepAR.switchEffect === 'function') {
+        await deepAR.switchEffect(null);
+      }
+      humanoidActive = false;
+      btnHumanoid.classList.remove('active-filter');
+      btnClear.classList.add('active-filter');
+      setRuntimeStatus('● No filter');
+    } catch (err) {
+      console.error('[Clear effect error]', err);
+      setRuntimeStatus('⚠ Could not clear filter');
+    } finally {
+      btnClear.disabled = false;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     GO LIVE / END STREAM
+  ══════════════════════════════════════════════════════════ */
+  function toggleStream() {
+    isStreaming ? endStream() : startStream();
+  }
+
+  function startStream() {
+    const canvas = deeparRoot.querySelector('canvas');
+    if (!canvas) {
+      alert('DeepAR canvas not found. Please wait for initialization.');
+      return;
+    }
+
+    try {
+      const videoStream = canvas.captureStream(30);
+
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(audioStream => {
+          audioStream.getAudioTracks().forEach(t => videoStream.addTrack(t));
+          liveStream = videoStream;
+          if (micMuted) liveStream.getAudioTracks().forEach(t => { t.enabled = false; });
+        })
+        .catch(() => { /* no mic, continue with video only */ });
+
+      liveStream = videoStream;
+
+      const mimeType = getSupportedMimeType();
+      mediaRecorder = new MediaRecorder(videoStream, mimeType ? { mimeType } : {});
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          // RTMP hook — in production send via WebSocket relay to ffmpeg
+          console.log(`[RTMP] → ${RTMP_URL}${STREAM_KEY} | ${event.data.size} bytes`);
+        }
+      };
+
+      mediaRecorder.onerror = (e) => {
+        console.error('[MediaRecorder error]', e);
+        setRuntimeStatus('⚠ Stream error');
+      };
+
+      mediaRecorder.start(1000);
+
+    } catch (err) {
+      console.error('[captureStream error]', err);
+      alert('Could not capture stream: ' + err.message);
+      return;
+    }
+
+    isStreaming = true;
+    goLiveBtn.classList.add('streaming');
+    liveIcon.innerHTML = `
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="#ff2d55">
+        <rect x="6" y="4" width="4" height="16"/>
+        <rect x="14" y="4" width="4" height="16"/>
+      </svg>`;
+    liveLbl.textContent = 'END';
+
+    liveBadge.classList.add('visible');
+    streamTimer.classList.add('visible');
+    rtmpInfo.classList.add('visible');
+
+    elapsedSeconds = 0;
+    timerInterval = setInterval(() => {
+      elapsedSeconds++;
+      streamTimer.textContent = formatTime(elapsedSeconds);
+    }, 1000);
+
+    setRuntimeStatus(`🔴 LIVE → ${RTMP_URL}${STREAM_KEY}`);
+  }
+
+  function endStream() {
+    try {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+    } catch (_) {}
+
+    if (liveStream) {
+      liveStream.getAudioTracks().forEach(t => t.stop());
+      liveStream = null;
+    }
+
+    clearInterval(timerInterval);
+    isStreaming = false;
+
+    goLiveBtn.classList.remove('streaming');
+    liveIcon.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+        <path d="M8 5v14l11-7z"/>
+      </svg>`;
+    liveLbl.textContent = 'GO LIVE';
+
+    liveBadge.classList.remove('visible');
+    streamTimer.classList.remove('visible');
+    rtmpInfo.classList.remove('visible');
+
+    setRuntimeStatus(`● Stream ended — ${formatTime(elapsedSeconds)} on air`);
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     FLIP CAMERA — FIX: complete rewrite
+     DeepAR v5+ exposes switchCamera(facingMode).
+     We also handle older API fallbacks.
+  ══════════════════════════════════════════════════════════ */
+  async function flipCamera() {
+    if (!deepAR || isFlipping) return;
+
+    isFlipping = true;
+    flipBtn.style.opacity = '0.4';
+    flipBtn.style.pointerEvents = 'none';
+
+    const nextFacing = facingMode === 'user' ? 'environment' : 'user';
+    setRuntimeStatus('Switching camera…');
+
+    try {
+      // FIX: DeepAR v5 switchCamera API — pass the facingMode string directly
+      if (typeof deepAR.switchCamera === 'function') {
+        await deepAR.switchCamera(nextFacing);
+        facingMode = nextFacing;
+        setRuntimeStatus(facingMode === 'user' ? '● Front camera' : '● Back camera');
+
+      } else {
+        // FIX: Fallback for older DeepAR — destroy & recreate with new facing mode
+        console.warn('[flipCamera] switchCamera() not available, using reinit fallback');
+        await reinitWithFacing(nextFacing);
+      }
+
+    } catch (err) {
+      console.error('[flipCamera error]', err);
+      // FIX: If switchCamera fails, try reinit fallback before giving up
+      try {
+        await reinitWithFacing(nextFacing);
+      } catch (err2) {
+        console.error('[flipCamera reinit error]', err2);
+        setRuntimeStatus('⚠ Camera switch failed');
+      }
+    } finally {
+      isFlipping = false;
+      flipBtn.style.opacity = '';
+      flipBtn.style.pointerEvents = '';
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     REINIT WITH NEW FACING MODE (fallback for older DeepAR)
+     FIX: Properly tear down and rebuild DeepAR instance.
+  ══════════════════════════════════════════════════════════ */
+  async function reinitWithFacing(newFacingMode) {
+    // Disable controls during reinit
+    goLiveBtn.disabled   = true;
+    btnHumanoid.disabled = true;
+    btnClear.disabled    = true;
+
+    setRuntimeStatus('Reinitializing camera…');
+
+    const hadHumanoid = humanoidActive;
+
+    // Tear down existing DeepAR instance
+    try {
+      if (deepAR) {
+        if (typeof deepAR.stopCamera === 'function') deepAR.stopCamera();
+        if (typeof deepAR.destroy   === 'function') deepAR.destroy();
+      }
+    } catch (_) {}
+    deepAR = null;
+
+    // Clear the root element
+    deeparRoot.innerHTML = '';
+
+    facingMode = newFacingMode;
+
+    // Wait a tick for camera hardware to release
+    await sleep(300);
+
+    // Rebuild DeepAR
+    deepAR = await DeepAR({
+      licenseKey:  DEEPAR_LICENSE_KEY,
+      libPath:     DEEPAR_LIB_PATH,
+      rootElement: deeparRoot,
+      additionalOptions: {
+        cameraConfig: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+      }
+    });
+
+    forceCanvasFullscreen();
+    await deepAR.downloadFaceTrackingModel(FACE_TRACKING_MODEL);
+
+    if (hadHumanoid) {
+      await deepAR.switchEffect(EFFECT_HUMANOID);
+      humanoidActive = true;
+    }
+
+    goLiveBtn.disabled   = false;
+    btnHumanoid.disabled = false;
+    btnClear.disabled    = false;
+
+    setRuntimeStatus(facingMode === 'user' ? '● Front camera' : '● Back camera');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     TOGGLE MIC
+  ══════════════════════════════════════════════════════════ */
+  function toggleMic() {
+    micMuted = !micMuted;
+
+    if (liveStream) {
+      liveStream.getAudioTracks().forEach(t => { t.enabled = !micMuted; });
+    }
+
+    micBtn.classList.toggle('muted', micMuted);
+
+    micIconEl.innerHTML = micMuted
+      ? `<line x1="1" y1="1" x2="23" y2="23"/>
+         <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+         <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+         <line x1="12" y1="19" x2="12" y2="23"/>
+         <line x1="8" y1="23" x2="16" y2="23"/>`
+      : `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+         <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+         <line x1="12" y1="19" x2="12" y2="23"/>
+         <line x1="8" y1="23" x2="16" y2="23"/>`;
+
+    setRuntimeStatus(micMuted ? '🔇 Mic muted' : '🎙 Mic on');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     ERROR HANDLING
+  ══════════════════════════════════════════════════════════ */
+  function handleCameraError(err) {
+    console.error('[Camera error]', err);
+    let msg;
+    switch (err.name) {
+      case 'NotAllowedError':
+        msg = 'Camera permission denied.\nAllow camera access in browser settings.';
+        break;
+      case 'NotFoundError':
+        msg = 'No camera found on this device.';
+        break;
+      case 'NotReadableError':
+        msg = 'Camera is in use by another app.';
+        break;
+      case 'OverconstrainedError':
+        // FIX: some devices don't support environment camera — retry with user
+        if (facingMode === 'environment') {
+          facingMode = 'user';
+          msg = 'Back camera unavailable. Switching to front.';
+          setTimeout(requestCameraAndInit, 800);
+        } else {
+          msg = `Camera constraint error: ${err.message}`;
+        }
+        break;
+      default:
+        msg = `Camera error: ${err.message}`;
+    }
+    setStatus(msg, 0);
+    grantBtn.textContent = 'Try Again';
+    grantBtn.style.display = 'block';
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     HELPERS
+  ══════════════════════════════════════════════════════════ */
+  function setStatus(msg, progress) {
+    statusText.textContent = msg;
+    if (progress !== undefined) progressFill.style.width = progress + '%';
+  }
+
+  function setRuntimeStatus(msg) {
+    runtimeStatus.textContent = msg;
+  }
+
+  function formatTime(s) {
+    const m   = String(Math.floor(s / 60)).padStart(2, '0');
+    const sec = String(s % 60).padStart(2, '0');
+    return `${m}:${sec}`;
+  }
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function getSupportedMimeType() {
+    const types = [
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm',
+    ];
+    return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     WAKE LOCK
+  ══════════════════════════════════════════════════════════ */
+  let wakeLock = null;
+  async function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      try { wakeLock = await navigator.wakeLock.request('screen'); }
+      catch (_) {}
+    }
+  }
+  requestWakeLock();
+  document.addEventListener('visibilitychange', () => {
+    if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     AUTO-START
+  ══════════════════════════════════════════════════════════ */
+  (async () => {
+    try {
+      const perm = await navigator.permissions.query({ name: 'camera' });
+      if (perm.state === 'granted') {
+        await requestCameraAndInit();
+      } else {
+        setStatus('Tap below to enable camera.');
+        grantBtn.style.display = 'block';
+      }
+    } catch (_) {
+      // Safari doesn't support permissions API
+      setStatus('Tap below to enable camera.');
+      grantBtn.style.display = 'block';
+    }
+  })();
+  </script>
+</body>
+</html>
