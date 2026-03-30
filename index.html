@@ -3,31 +3,31 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AI Live Face App</title>
+    <title>AI Live App</title>
     
     <script src="https://cdn.jsdelivr.net/npm/deepar/js/deepar.js"></script>
     
     <style>
         body { margin: 0; background: black; color: white; overflow: hidden; font-family: sans-serif; }
+        /* මුළු තිරයම වැහෙන විදියට වීඩියෝව පෙන්වීමට */
         #deepar-div { width: 100vw; height: 100vh; }
-        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; z-index: 10;}
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px;}
     </style>
 </head>
 <body>
 
-    <div id="loading">කැමරාව සහ ෆිල්ටරය සූදානම් වෙමින් පවතී...<br><small>කරුණාකර රැඳී සිටින්න</small></div>
+    <div id="loading">කැමරාව සූදානම් වෙමින් පවතී...<br><small>කරුණාකර රැඳී සිටින්න</small></div>
     
     <div id="deepar-div"></div>
 
     <script>
         (async function() {
             try {
+                // අලුත් ක්‍රමයට DeepAR පණගැන්වීම
                 const deepAR = await deepar.initialize({
                     licenseKey: '62146334e3e052fa425e4ca04463f2b04132e604685d263bc9c344110cbee75f082686de17027cfa',
                     previewElement: document.querySelector('#deepar-div'),
-                    
-                    // කිසිම ෆයිල් එකක් නැතුව කෙලින්ම ඉන්ටර්නෙට් එකෙන් Makeup ෆිල්ටර් එක ලෝඩ් කිරීම
-                    effect: 'https://cdn.jsdelivr.net/npm/deepar/effects/makeup' 
+                    effect: 'Humanoid.deepar' // මේ ෆයිල් එක index.html ගාවම තියෙන්න ඕනේ
                 });
 
                 // Load වූ පසු පණිවිඩය ඉවත් කිරීම
@@ -41,4 +41,3 @@
     </script>
 </body>
 </html>
-
