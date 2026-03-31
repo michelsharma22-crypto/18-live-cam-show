@@ -2,42 +2,127 @@
 <html lang="si">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AI Live App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>AI Live Stream App</title>
     
     <script src="https://cdn.jsdelivr.net/npm/deepar/js/deepar.js"></script>
     
     <style>
-        body { margin: 0; background: black; color: white; overflow: hidden; font-family: sans-serif; }
-        /* මුළු තිරයම වැහෙන විදියට වීඩියෝව පෙන්වීමට */
-        #deepar-div { width: 100vw; height: 100vh; }
-        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px;}
+        body { margin: 0; padding: 0; background: black; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        
+        /* කැමරාව පෙන්වන තිරය */
+        #deepar-div { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+
+        /* පාලක පැනලය (Buttons) */
+        .ui-overlay {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        /* Go Live බටන් එක */
+        #go-live-btn {
+            background: linear-gradient(45deg, #ff416c, #ff4b2b);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 75, 43, 0.4);
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        #go-live-btn.streaming {
+            background: #444;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        /* Status Indicator */
+        #status {
+            color: white;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        /* Loading Screen */
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: white; display: flex; align-items: center;
+            justify-content: center; z-index: 100;
+        }
     </style>
 </head>
 <body>
 
-    <div id="loading">කැමරාව සූදානම් වෙමින් පවතී...<br><small>කරුණාකර රැඳී සිටින්න</small></div>
-    
+    <div id="loading-screen">කැමරාව සහ ෆිල්ටර සූදානම් වේ...</div>
+
     <div id="deepar-div"></div>
 
+    <div class="ui-overlay">
+        <div id="status">පද්ධතිය සූදානම්</div>
+        <button id="go-live-btn" onclick="toggleStream()">Go Live</button>
+    </div>
+
     <script>
-        (async function() {
+        let deepAR;
+        let isStreaming = false;
+
+        async function init() {
             try {
-                // අලුත් ක්‍රමයට DeepAR පණගැන්වීම
-                const deepAR = await deepar.initialize({
+                deepAR = await deepar.initialize({
                     licenseKey: '62146334e3e052fa425e4ca04463f2b04132e604685d263bc9c344110cbee75f082686de17027cfa',
                     previewElement: document.querySelector('#deepar-div'),
-                    effect: 'Humanoid.deepar' // මේ ෆයිල් එක index.html ගාවම තියෙන්න ඕනේ
+                    // ගැහැනු පෙනුම ලබාදෙන නිල Makeup ෆිල්ටරය
+                    effect: 'https://cdn.jsdelivr.net/npm/deepar/effects/makeup'
                 });
 
-                // Load වූ පසු පණිවිඩය ඉවත් කිරීම
-                document.getElementById('loading').style.display = 'none';
-
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('status').innerText = "ගැහැනු පෙනුම සක්‍රියයි (Makeup Filter On)";
             } catch (error) {
-                console.error("DeepAR Error:", error);
-                document.getElementById('loading').innerHTML = "දෝෂයකි!<br><small style='color:red;'>" + error.message + "</small>";
+                console.error(error);
+                document.getElementById('loading-screen').innerText = "දෝෂයකි: " + error.message;
             }
-        })();
+        }
+
+        function toggleStream() {
+            const btn = document.getElementById('go-live-btn');
+            const status = document.getElementById('status');
+
+            if (!isStreaming) {
+                // Live Stream එක ආරම්භ කරන කොටස
+                isStreaming = true;
+                btn.innerText = "End Stream";
+                btn.classList.add('streaming');
+                status.innerText = "ඔබ දැන් සජීවීව (Live) සම්බන්ධ වී ඇත...";
+                console.log("Streaming started...");
+                
+                // මහිෂ, මෙතැනට තමයි ඔයාගේ RTMP Server ලින්ක් එක පසුව සම්බන්ධ කරන්නේ.
+            } else {
+                // Live Stream එක නතර කරන කොටස
+                isStreaming = false;
+                btn.innerText = "Go Live";
+                btn.classList.remove('streaming');
+                status.innerText = "සජීවී විකාශය අවසන් කරන ලදී.";
+                console.log("Streaming stopped.");
+            }
+        }
+
+        init();
     </script>
 </body>
 </html>
